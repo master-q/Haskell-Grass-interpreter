@@ -16,7 +16,7 @@ Grass言語については↓を参照してください。
 ------
 
     $ make
-    $ ./grass < sample/infw.in
+    $ ./GrassCommand < sample/infw.in
     wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww...
 
 でもまだutf8対応してないです。
