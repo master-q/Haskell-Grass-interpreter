@@ -1,3 +1,4 @@
+module Grass (parseGrass, filterOnlyGrass, mysequence, stateGrass, initGrassState) where
 import Data.Char
 import qualified Control.Monad.State as S
 import Text.ParserCombinators.Parsec
@@ -17,7 +18,8 @@ initGrassEnv = [GepOut, GepSucc, GepChar 'w', GepIn]
 -- D0 = (App(1, 1)::ε, ε) :: (ε, ε) :: ε
 initGrassDump :: [GrassDump]
 initGrassDump = [GD [GrassApp 1 1] [], GD [] []]
-
+initGrassState :: [GrassCode] -> GrassState
+initGrassState c = GS {gCode = c, gEnv = initGrassEnv, gDump = initGrassDump}
 {--
 showState :: GrassState -> String
 showState s = "GS{C:" ++ show (gCode s) ++ "\n" ++
@@ -101,13 +103,3 @@ filterOnlyGrass (x:xs) = go x -- xxx これもうちょっとなんとかしな�
         go 'v' = 'v' : filterOnlyGrass xs
         go _ = filterOnlyGrass xs
 filterOnlyGrass [] = []
-
-main :: IO ()
-main = do
-  c <- getContents -- xxx utf8化すべき
-  case parse parseGrass "(unknown)" (filterOnlyGrass c) of
-    Left e -> do putStrLn "Error parsing input:"
-                 print e
-    Right r -> mapM_ (putStr . fst) $ 
-               S.evalState (mysequence $ repeat stateGrass)
-               GS {gCode = r, gEnv = initGrassEnv, gDump = initGrassDump}

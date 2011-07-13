@@ -1,14 +1,15 @@
-grass: grass.hs
-	ghc --make -Wall grass.hs
+GrassCommand: GrassCommand.hs
+	ghc --make -Wall GrassCommand.hs
 
 lint:
-	hlint grass.hs
+	hlint GrassCommand.hs Grass.hs
 
-test: grass
-	stdiochk -n ./grass testdata
+test: GrassCommand
+	stdiochk -n ./GrassCommand testdata
 
 clean:
-	rm -rf grass grass.o grass.hi
+	rm -rf GrassCommand
+	rm -rf *.hi *.o
 	rm -rf *~
 	rm -rf */*~
 
