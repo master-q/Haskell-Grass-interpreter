@@ -9,6 +9,6 @@ main = do
   case toGrassCode s of
     Left e -> do putStrLn "Error parsing input:"
                  print e
-    Right r -> mapM_ (putStr . fst) $ 
+    Right r -> putStr $ 
                S.evalState stateGrass $
                initGrassState r

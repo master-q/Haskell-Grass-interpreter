@@ -54,51 +54,55 @@ toGrassCode :: String -> Either ParseError [GrassCode]
 toGrassCode c = parse parseGrass "(unknown)" (filterOnlyGrass c)
 
 -- state machine --
-grassStep :: GrassState -> (GrassState, Bool, String)
+type GrassRet = Either String (Maybe Char)
+
+grassStep :: GrassState -> (GrassState, GrassRet)
 -- (Abs(n, C') :: C, E, D) → (C, (C', E) :: E, D) if n = 1
-grassStep (GS (GrassAbs 1 ac:cs) e d) = (GS cs (GE ac e:e) d, False, "")
+grassStep (GS (GrassAbs 1 ac:cs) e d) = (GS cs (GE ac e:e) d, Right Nothing)
 -- (Abs(n, C') :: C, E, D) → (C, (Abs(n - 1, C')::ε, E) :: E, D) if n > 1
 grassStep (GS (GrassAbs n ac:cs) e d) =
-  (GS cs (GE [GrassAbs (n - 1) ac] e:e) d, False, "")
+  (GS cs (GE [GrassAbs (n - 1) ac] e:e) d, Right Nothing)
 -- (ε, f :: E, (C', E') :: D) → (C', f :: E', D)
-grassStep (GS [] (e:_) (GD dc de:ds)) = (GS dc (e:de) ds, False, "")
+grassStep (GS [] (e:_) (GD dc de:ds)) = (GS dc (e:de) ds, Right Nothing)
 -- (App(m, n) :: C, E, D) → (Cm, (Cn, En) :: Em, (C, E) :: D) 
 --   where E = (C1, E1) :: (C2, E2) :: … :: (Ci, Ei) :: E' (i = m, n)
 grassStep (GS (GrassApp m n:cs) e d) = go (e!!(m - 1)) (e!!(n - 1))
-  where go (GE ecm eem) en = (GS ecm (en:eem) (GD cs e:d), False, "")
+  where go (GE ecm eem) en = (GS ecm (en:eem) (GD cs e:d), Right Nothing)
         go (GepChar c1) (GepChar c2) =
           let r | c1 == c2  = GE [GrassAbs 1 [GrassApp 3 2]] [GE [] []]
                 | otherwise = GE [GrassAbs 1 []] []
-          in (GS cs (r:e) d, False, "")
+          in (GS cs (r:e) d, Right Nothing)
         go (GepChar c) arg = error ("called GepChar " ++ show c ++ 
                                     " with " ++ show arg)
         go GepSucc (GepChar c) = let co = 1 + ord c
                                      cn | co < 256  = chr co
                                         | otherwise = chr 0
-                                 in (GS cs (GepChar cn:e) d, False, "")
+                                 in (GS cs (GepChar cn:e) d, Right Nothing)
         go GepSucc arg = error ("called GepSucc with " ++ show arg)
-        go GepOut (GepChar c) = (GS cs (GepChar c:e) d, False, [c])
+        go GepOut (GepChar c) = (GS cs (GepChar c:e) d, Right $ Just c)
         go GepOut arg = error ("called GepOut with " ++ show arg)
         go GepIn arg = error ("called GepIn with" ++ show arg)
 -- (C0, E0, D0) →* (ε, f :: ε, ε)
-grassStep (GS [] [e] []) = (GS [] [e] [], True, "") -- end
+grassStep (GS [] [e] []) = (GS [] [e] [], Left "") -- end
 grassStep s = error $ "error state => " ++ show s
 
-stateGrass'' :: S.State GrassState (String, Bool)
+stateGrass'' :: S.State GrassState GrassRet
 stateGrass'' = do st <- S.get
-                  let (st', b, out) = grassStep st
+                  let (st', ret) = grassStep st
                   S.put st'
-                  return (out, b)
---                return (out ++ showState st' ++ "\n", b)
+                  return ret
 
-mysequence :: Monad m => [m (a, Bool)] -> m [(a, Bool)]
+mysequence :: Monad m => [m GrassRet] -> m String
 mysequence ms = foldr k (return []) ms
   where
-    k m m' = do (x, b) <- m
+    k m m' = do ret <- m
                 xs <- m'
-                if b then return [(x, b)] else return ((x, b):xs)
+                case ret of
+                  Left e -> return e
+                  Right Nothing -> return xs
+                  Right (Just x) -> return (x:xs)
 
-stateGrass :: S.State GrassState [(String, Bool)]
+stateGrass :: S.State GrassState String
 stateGrass = mysequence $ repeat stateGrass''
 
 -- main --
