@@ -86,11 +86,11 @@ grassStep (GS (GrassApp m n:cs) e d) = go (e!!(m - 1)) (e!!(n - 1))
 grassStep (GS [] [e] []) = (GS [] [e] [], Left "") -- end
 grassStep s = error $ "error state => " ++ show s
 
-stateGrass'' :: S.State GrassState GrassRet
-stateGrass'' = do st <- S.get
-                  let (st', ret) = grassStep st
-                  S.put st'
-                  return ret
+stateGrass' :: S.State GrassState GrassRet
+stateGrass' = do st <- S.get
+                 let (st', ret) = grassStep st
+                 S.put st'
+                 return ret
 
 mysequence :: Monad m => [m GrassRet] -> m String
 mysequence ms = foldr k (return []) ms
@@ -103,7 +103,7 @@ mysequence ms = foldr k (return []) ms
                   Right (Just x) -> return (x:xs)
 
 stateGrass :: S.State GrassState String
-stateGrass = mysequence $ repeat stateGrass''
+stateGrass = mysequence $ repeat stateGrass'
 
 -- main --
 filterOnlyGrass :: String -> String

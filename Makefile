@@ -1,16 +1,31 @@
-GrassCommand: GrassCommand.hs
+all: GrassCommand GrassFs
+
+GrassCommand: GrassCommand.hs Grass.hs
 	ghc --make -Wall GrassCommand.hs
 
-lint:
-	hlint GrassCommand.hs Grass.hs
+GrassFs: GrassFs.hs Grass.hs
+	ghc -threaded --make -Wall GrassFs.hs
 
-test: GrassCommand
+lint:
+	hlint -c GrassCommand.hs GrassFs.hs Grass.hs
+
+test: test_command
+
+test_command: GrassCommand
 	stdiochk -n ./GrassCommand testdata
 
+test_fs: GrassFs
+	mkdir -p mount
+	./GrassFs mount
+	ls mount
+	cat mount/hello
+	fusermount -u mount
+
 clean:
-	rm -rf GrassCommand
+	rm -rf GrassCommand GrassFs
 	rm -rf *.hi *.o
 	rm -rf *~
 	rm -rf */*~
+	rm -rf mount
 
 .PHONY: lint clean
