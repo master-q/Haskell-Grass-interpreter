@@ -72,19 +72,22 @@ grassStep (GS (GrassApp m n:cs) e d) = go (e!!(m - 1)) (e!!(n - 1))
           let r | c1 == c2  = GE [GrassAbs 1 [GrassApp 3 2]] [GE [] []]
                 | otherwise = GE [GrassAbs 1 []] []
           in (GS cs (r:e) d, Right Nothing)
-        go (GepChar c) arg = error ("called GepChar " ++ show c ++ 
-                                    " with " ++ show arg)
+        go (GepChar c) arg = (GS [] [] [],
+                              Left ("called GepChar " ++ show c ++ 
+                                    " with " ++ show arg))
         go GepSucc (GepChar c) = let co = 1 + ord c
                                      cn | co < 256  = chr co
                                         | otherwise = chr 0
                                  in (GS cs (GepChar cn:e) d, Right Nothing)
-        go GepSucc arg = error ("called GepSucc with " ++ show arg)
+        go GepSucc arg = (GS [] [] [],
+                          Left ("called GepSucc with " ++ show arg))
         go GepOut (GepChar c) = (GS cs (GepChar c:e) d, Right $ Just c)
-        go GepOut arg = error ("called GepOut with " ++ show arg)
-        go GepIn arg = error ("called GepIn with" ++ show arg)
+        go GepOut arg = (GS [] [] [],
+                         Left ("called GepOut with " ++ show arg))
+        go GepIn arg = (GS [] [] [], Left ("called GepIn with" ++ show arg))
 -- (C0, E0, D0) →* (ε, f :: ε, ε)
 grassStep (GS [] [e] []) = (GS [] [e] [], Left "") -- end
-grassStep s = error $ "error state => " ++ show s
+grassStep s = (GS [] [] [], Left $ "error state => " ++ show s)
 
 stateGrass' :: S.State GrassState GrassRet
 stateGrass' = do st <- S.get
