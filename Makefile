@@ -18,7 +18,7 @@ test_fs: GrassFs
 	mkdir -p mount
 	./GrassFs mount
 	ls mount
-	cat mount/hello
+	cat mount/grassvm
 	fusermount -u mount
 
 clean:

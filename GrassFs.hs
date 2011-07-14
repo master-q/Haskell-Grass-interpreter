@@ -17,11 +17,11 @@ import Grass
 type HT = ()
 
 data GrassfsState = GrassfsState {
-  src :: B.ByteString
+  src :: String
 }
 
 grassfsstate :: IORef GrassfsState
-grassfsstate = unsafePerformIO $ newIORef GrassfsState { src = B.pack "wWWwwww" }
+grassfsstate = unsafePerformIO $ newIORef GrassfsState { src = "wWWwwww" }
 
 updateGrassfsState :: MonadIO m => (GrassfsState -> GrassfsState) -> m ()
 updateGrassfsState fn = liftIO $! atomicModifyIORef grassfsstate $ \st -> (fn st, ())
@@ -41,7 +41,7 @@ grassfsOps = defaultFuseOps { fuseGetFileStat = grassfsGetFileStat
                             , fuseGetFileSystemStats = grassfsGetFileSystemStats
                             }
 grassfsPath :: FilePath
-grassfsPath = "/hello"
+grassfsPath = "/grassvm"
 
 dirStat :: FuseContext -> FileStat
 dirStat ctx = FileStat { statEntryType = Directory
@@ -64,8 +64,8 @@ dirStat ctx = FileStat { statEntryType = Directory
                        , statStatusChangeTime = 0
                        }
 
-fileStat :: FuseContext -> B.ByteString -> FileStat
-fileStat ctx source = FileStat { statEntryType = RegularFile
+fileStat :: FuseContext -> FileStat
+fileStat ctx = FileStat { statEntryType = RegularFile
                         , statFileMode = foldr1 unionFileModes
                                            [ ownerReadMode
                                            , groupReadMode
@@ -75,7 +75,7 @@ fileStat ctx source = FileStat { statEntryType = RegularFile
                         , statFileOwner = fuseCtxUserID ctx
                         , statFileGroup = fuseCtxGroupID ctx
                         , statSpecialDeviceID = 0
-                        , statFileSize = fromIntegral $ B.length source
+                        , statFileSize = 4096 -- xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
                         , statBlocks = 1
                         , statAccessTime = 0
                         , statModificationTime = 0
@@ -88,8 +88,7 @@ grassfsGetFileStat "/" = do
     return $ Right $ dirStat ctx
 grassfsGetFileStat path | path == grassfsPath = do
     ctx <- getFuseContext
-    src' <- queryGrassfsState src
-    return $ Right $ fileStat ctx src'
+    return $ Right $ fileStat ctx
 grassfsGetFileStat _ =
     return $ Left eNOENT
 
@@ -99,12 +98,10 @@ grassfsOpenDirectory _   = return eNOENT
 
 grassfsReadDirectory :: FilePath -> IO (Either Errno [(FilePath, FileStat)])
 grassfsReadDirectory "/" = do
-    updateGrassfsState $ \s -> s { src = B.concat [src s, B.pack "1"] }
-    src' <- queryGrassfsState src
     ctx <- getFuseContext
     return $ Right [(".",          dirStat  ctx)
                    ,("..",         dirStat  ctx)
-                   ,(grassfsName,    fileStat ctx src')
+                   ,(grassfsName,    fileStat ctx)
                    ]
     where (_:grassfsName) = grassfsPath
 grassfsReadDirectory _ = return (Left eNOENT)
@@ -121,7 +118,7 @@ grassfsRead :: FilePath -> HT -> ByteCount -> FileOffset -> IO (Either Errno B.B
 grassfsRead path _ byteCount offset
     | path == grassfsPath = do
         grassfsSrc <- queryGrassfsState src
-        let out = case toGrassCode $ B.unpack grassfsSrc of
+        let out = case toGrassCode $ grassfsSrc of
               Left e -> "Error parsing input:" ++ show e
               Right r -> S.evalState stateGrass $ initGrassState r
         return $ Right $
