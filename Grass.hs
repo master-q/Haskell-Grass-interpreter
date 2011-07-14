@@ -1,4 +1,4 @@
-module Grass (parseGrass, filterOnlyGrass, mysequence, stateGrass, initGrassState) where
+module Grass (toGrassCode, stateGrass, initGrassState) where
 import Data.Char
 import qualified Control.Monad.State as S
 import Text.ParserCombinators.Parsec
@@ -50,18 +50,21 @@ parseAbs = do a <- many1 $ char 'w'
               b <- many parseApp
               return (GrassAbs (length a) b)
 
+toGrassCode :: String -> Either ParseError [GrassCode]
+toGrassCode c = parse parseGrass "(unknown)" (filterOnlyGrass c)
+
 -- state machine --
-stateGrass' :: GrassState -> (GrassState, Bool, String)
+grassStep :: GrassState -> (GrassState, Bool, String)
 -- (Abs(n, C') :: C, E, D) → (C, (C', E) :: E, D) if n = 1
-stateGrass' (GS (GrassAbs 1 ac:cs) e d) = (GS cs (GE ac e:e) d, False, "")
+grassStep (GS (GrassAbs 1 ac:cs) e d) = (GS cs (GE ac e:e) d, False, "")
 -- (Abs(n, C') :: C, E, D) → (C, (Abs(n - 1, C')::ε, E) :: E, D) if n > 1
-stateGrass' (GS (GrassAbs n ac:cs) e d) = 
+grassStep (GS (GrassAbs n ac:cs) e d) =
   (GS cs (GE [GrassAbs (n - 1) ac] e:e) d, False, "")
 -- (ε, f :: E, (C', E') :: D) → (C', f :: E', D)
-stateGrass' (GS [] (e:_) (GD dc de:ds)) = (GS dc (e:de) ds, False, "")
+grassStep (GS [] (e:_) (GD dc de:ds)) = (GS dc (e:de) ds, False, "")
 -- (App(m, n) :: C, E, D) → (Cm, (Cn, En) :: Em, (C, E) :: D) 
 --   where E = (C1, E1) :: (C2, E2) :: … :: (Ci, Ei) :: E' (i = m, n)
-stateGrass' (GS (GrassApp m n:cs) e d) = go (e!!(m - 1)) (e!!(n - 1))
+grassStep (GS (GrassApp m n:cs) e d) = go (e!!(m - 1)) (e!!(n - 1))
   where go (GE ecm eem) en = (GS ecm (en:eem) (GD cs e:d), False, "")
         go (GepChar c1) (GepChar c2) =
           let r | c1 == c2  = GE [GrassAbs 1 [GrassApp 3 2]] [GE [] []]
@@ -78,14 +81,14 @@ stateGrass' (GS (GrassApp m n:cs) e d) = go (e!!(m - 1)) (e!!(n - 1))
         go GepOut arg = error ("called GepOut with " ++ show arg)
         go GepIn arg = error ("called GepIn with" ++ show arg)
 -- (C0, E0, D0) →* (ε, f :: ε, ε)
-stateGrass' (GS [] [e] []) = (GS [] [e] [], True, "") -- end
-stateGrass' s = error $ "error state => " ++ show s
+grassStep (GS [] [e] []) = (GS [] [e] [], True, "") -- end
+grassStep s = error $ "error state => " ++ show s
 
-stateGrass :: S.State GrassState (String, Bool)
-stateGrass = do st <- S.get
-                let (st', b, out) = stateGrass' st
-                S.put st'
-                return (out, b)
+stateGrass'' :: S.State GrassState (String, Bool)
+stateGrass'' = do st <- S.get
+                  let (st', b, out) = grassStep st
+                  S.put st'
+                  return (out, b)
 --                return (out ++ showState st' ++ "\n", b)
 
 mysequence :: Monad m => [m (a, Bool)] -> m [(a, Bool)]
@@ -94,6 +97,9 @@ mysequence ms = foldr k (return []) ms
     k m m' = do (x, b) <- m
                 xs <- m'
                 if b then return [(x, b)] else return ((x, b):xs)
+
+stateGrass :: S.State GrassState [(String, Bool)]
+stateGrass = mysequence $ repeat stateGrass''
 
 -- main --
 filterOnlyGrass :: String -> String
