@@ -20,6 +20,15 @@ test_fs: GrassFs
 	ls mount
 	cat mount/grassvm
 	fusermount -u mount
+	rm -rf mount
+
+mount: GrassFs
+	mkdir -p mount
+	./GrassFs mount
+
+umount:
+	fusermount -u mount
+	rm -rf mount
 
 clean:
 	rm -rf GrassCommand GrassFs
@@ -29,4 +38,4 @@ clean:
 	-fusermount -u mount
 	rm -rf mount
 
-.PHONY: lint clean
+.PHONY: lint clean mount umount

@@ -137,13 +137,14 @@ grassfsRead path _ byteCount offset
         let out = case toGrassCode grassfsSrc of
               Left e -> "Error parsing input:" ++ show e
               Right r -> S.evalState stateGrass $ initGrassState r
-        return $ Right $ -- xxxxxxxxxxxxxxxx サイズチェック必要
-          B.pack $ take (fromIntegral byteCount) $ 
-          drop (fromIntegral offset) out
+        let outchop = take (fromIntegral byteCount) $
+                      drop (fromIntegral offset) out
+        if null outchop
+          then return (Left eINVAL) -- xxx fstatでファイルサイズ指定しないとエラー
+          else return $ Right $ B.pack outchop
     | otherwise         = return $ Left eNOENT
 
 grassfsWrite :: FilePath -> HT -> B.ByteString -> FileOffset -> IO (Either Errno ByteCount)
---grassfsWrite _ _ bstr _ = return $ Right $ fromIntegral $ B.length bstr
 grassfsWrite path _ bstr offset
   | path == grassfsPath = do
     updateSrc $ injectString (fromIntegral offset) $ B.unpack bstr
