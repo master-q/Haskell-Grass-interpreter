@@ -20,6 +20,7 @@ data GrassfsState = GrassfsState {
   src :: String
 }
 
+-- global value
 grassfsstate :: IORef GrassfsState
 grassfsstate = unsafePerformIO $ newIORef GrassfsState { src = "wWWwwww" }
 
@@ -29,13 +30,25 @@ updateGrassfsState fn = liftIO $! atomicModifyIORef grassfsstate $ \st -> (fn st
 queryGrassfsState :: MonadIO m => (GrassfsState -> a) -> m a
 queryGrassfsState fn = liftM fn $ liftIO $! readIORef grassfsstate
 
+updateSrc :: MonadIO m => (String -> String) -> m ()
+updateSrc fn = updateGrassfsState (\s -> s { src = fn $ src s })
+
+injectString :: Int -> String -> String -> String
+injectString offset istr tstr = map fn pstr
+  where fn (' ', ts) = ts
+        fn (is, _) = is
+        pstr = zip ((replicate offset ' ') ++ istr) (take m (tstr ++ repeat ' '))
+          where m = max (offset + length istr) (length tstr)
+
 main :: IO ()
 main = fuseMain grassfsOps defaultExceptionHandler
 
 grassfsOps :: FuseOperations HT
 grassfsOps = defaultFuseOps { fuseGetFileStat = grassfsGetFileStat
                             , fuseOpen        = grassfsOpen
+                            , fuseSetFileSize = grassfsSetFileSize
                             , fuseRead        = grassfsRead 
+                            , fuseWrite       = grassfsWrite
                             , fuseOpenDirectory = grassfsOpenDirectory
                             , fuseReadDirectory = grassfsReadDirectory
                             , fuseGetFileSystemStats = grassfsGetFileSystemStats
@@ -68,14 +81,17 @@ fileStat :: FuseContext -> FileStat
 fileStat ctx = FileStat { statEntryType = RegularFile
                         , statFileMode = foldr1 unionFileModes
                                            [ ownerReadMode
+                                           , ownerWriteMode
                                            , groupReadMode
+                                           , groupWriteMode
                                            , otherReadMode
+                                           , otherWriteMode
                                            ]
                         , statLinkCount = 1
                         , statFileOwner = fuseCtxUserID ctx
                         , statFileGroup = fuseCtxGroupID ctx
                         , statSpecialDeviceID = 0
-                        , statFileSize = 4096 -- xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                        , statFileSize = 1073741824 -- xxx とりあえずデカく
                         , statBlocks = 1
                         , statAccessTime = 0
                         , statModificationTime = 0
@@ -96,6 +112,9 @@ grassfsOpenDirectory :: FilePath -> IO Errno
 grassfsOpenDirectory "/" = return eOK
 grassfsOpenDirectory _   = return eNOENT
 
+grassfsSetFileSize :: FilePath -> FileOffset -> IO Errno
+grassfsSetFileSize path off = return eOK
+
 grassfsReadDirectory :: FilePath -> IO (Either Errno [(FilePath, FileStat)])
 grassfsReadDirectory "/" = do
     ctx <- getFuseContext
@@ -108,23 +127,28 @@ grassfsReadDirectory _ = return (Left eNOENT)
 
 grassfsOpen :: FilePath -> OpenMode -> OpenFileFlags -> IO (Either Errno HT)
 grassfsOpen path mode flags
-    | path == grassfsPath = case mode of
-                            ReadOnly -> return (Right ())
-                            _        -> return (Left eACCES)
+    | path == grassfsPath = return (Right ())
     | otherwise         = return (Left eNOENT)
-
 
 grassfsRead :: FilePath -> HT -> ByteCount -> FileOffset -> IO (Either Errno B.ByteString)
 grassfsRead path _ byteCount offset
     | path == grassfsPath = do
         grassfsSrc <- queryGrassfsState src
-        let out = case toGrassCode $ grassfsSrc of
+        let out = case toGrassCode grassfsSrc of
               Left e -> "Error parsing input:" ++ show e
               Right r -> S.evalState stateGrass $ initGrassState r
-        return $ Right $
+        return $ Right $ -- xxxxxxxxxxxxxxxx サイズチェック必要
           B.pack $ take (fromIntegral byteCount) $ 
           drop (fromIntegral offset) out
     | otherwise         = return $ Left eNOENT
+
+grassfsWrite :: FilePath -> HT -> B.ByteString -> FileOffset -> IO (Either Errno ByteCount)
+--grassfsWrite _ _ bstr _ = return $ Right $ fromIntegral $ B.length bstr
+grassfsWrite path _ bstr offset
+  | path == grassfsPath = do
+    updateSrc $ injectString (fromIntegral offset) $ B.unpack bstr
+    return $ Right $ fromIntegral $ B.length bstr
+  | otherwise = return $ Left eNOENT
 
 grassfsGetFileSystemStats :: String -> IO (Either Errno FileSystemStats)
 grassfsGetFileSystemStats str =

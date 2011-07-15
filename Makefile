@@ -26,6 +26,7 @@ clean:
 	rm -rf *.hi *.o
 	rm -rf *~
 	rm -rf */*~
+	-fusermount -u mount
 	rm -rf mount
 
 .PHONY: lint clean
