@@ -35,9 +35,10 @@ updateSrc fn = updateGrassfsState (\s -> s { src = fn $ src s })
 
 injectString :: Int -> String -> String -> String
 injectString offset istr tstr = map fn pstr
-  where fn (' ', ts) = ts
-        fn (is, _) = is
-        pstr = zip (replicate offset ' ' ++ istr) (take m (tstr ++ repeat ' '))
+  where fn (Nothing, ts) = ts
+        fn (Just is, _) = is
+        pstr = zip (replicate offset Nothing ++ map Just istr)
+               (take m (tstr ++ repeat ' '))
           where m = max (offset + length istr) (length tstr)
 
 main :: IO ()
