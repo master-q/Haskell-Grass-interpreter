@@ -9,16 +9,15 @@ GrassFs: GrassFs.hs Grass.hs
 lint:
 	hlint -c GrassCommand.hs GrassFs.hs Grass.hs
 
-test: test_command
+test: test_command test_fs
 
 test_command: GrassCommand
-	stdiochk -n ./GrassCommand testdata
+	-stdiochk -n ./GrassCommand testdata
 
 test_fs: GrassFs
 	mkdir -p mount
 	./GrassFs mount
-	ls mount
-	cat mount/grassvm
+	-stdiochk -n ./script/grassfsIO.sh testdata
 	fusermount -u mount
 	rm -rf mount
 

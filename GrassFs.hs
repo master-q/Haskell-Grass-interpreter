@@ -77,8 +77,8 @@ dirStat ctx = FileStat { statEntryType = Directory
                        , statStatusChangeTime = 0
                        }
 
-fileStat :: FuseContext -> FileStat
-fileStat ctx = FileStat { statEntryType = RegularFile
+fileStat :: FuseContext -> String -> FileStat
+fileStat ctx s = FileStat { statEntryType = RegularFile
                         , statFileMode = foldr1 unionFileModes
                                            [ ownerReadMode
                                            , ownerWriteMode
@@ -91,7 +91,7 @@ fileStat ctx = FileStat { statEntryType = RegularFile
                         , statFileOwner = fuseCtxUserID ctx
                         , statFileGroup = fuseCtxGroupID ctx
                         , statSpecialDeviceID = 0
-                        , statFileSize = 1073741824 -- xxx とりあえずデカく
+                        , statFileSize = fromIntegral $ length s
                         , statBlocks = 1
                         , statAccessTime = 0
                         , statModificationTime = 0
@@ -104,7 +104,8 @@ grassfsGetFileStat "/" = do
     return $ Right $ dirStat ctx
 grassfsGetFileStat path | path == grassfsPath = do
     ctx <- getFuseContext
-    return $ Right $ fileStat ctx
+    grassfsSrc <- queryGrassfsState src
+    return $ Right $ fileStat ctx grassfsSrc
 grassfsGetFileStat _ =
     return $ Left eNOENT
 
@@ -118,9 +119,10 @@ grassfsSetFileSize _ _ = return eOK
 grassfsReadDirectory :: FilePath -> IO (Either Errno [(FilePath, FileStat)])
 grassfsReadDirectory "/" = do
     ctx <- getFuseContext
+    grassfsSrc <- queryGrassfsState src
     return $ Right [(".",          dirStat  ctx)
                    ,("..",         dirStat  ctx)
-                   ,(grassfsName,    fileStat ctx)
+                   ,(grassfsName,    fileStat ctx grassfsSrc)
                    ]
     where (_:grassfsName) = grassfsPath
 grassfsReadDirectory _ = return (Left eNOENT)
@@ -130,15 +132,17 @@ grassfsOpen path _ _
     | path == grassfsPath = return (Right ())
     | otherwise         = return (Left eNOENT)
 
+runGrassSrc :: String -> String
+runGrassSrc s = case toGrassCode s of
+  Left e -> "Error parsing input:" ++ show e
+  Right r -> S.evalState stateGrass $ initGrassState r
+
 grassfsRead :: FilePath -> HT -> ByteCount -> FileOffset -> IO (Either Errno B.ByteString)
 grassfsRead path _ byteCount offset
     | path == grassfsPath = do
         grassfsSrc <- queryGrassfsState src
-        let out = case toGrassCode grassfsSrc of
-              Left e -> "Error parsing input:" ++ show e
-              Right r -> S.evalState stateGrass $ initGrassState r
         let outchop = take (fromIntegral byteCount) $
-                      drop (fromIntegral offset) out
+                      drop (fromIntegral offset) (runGrassSrc grassfsSrc)
         if null outchop
           then return (Left eINVAL) -- xxx fstatでファイルサイズ指定しないとエラー
           else return $ Right $ B.pack outchop
