@@ -37,7 +37,7 @@ injectString :: Int -> String -> String -> String
 injectString offset istr tstr = map fn pstr
   where fn (' ', ts) = ts
         fn (is, _) = is
-        pstr = zip ((replicate offset ' ') ++ istr) (take m (tstr ++ repeat ' '))
+        pstr = zip (replicate offset ' ' ++ istr) (take m (tstr ++ repeat ' '))
           where m = max (offset + length istr) (length tstr)
 
 main :: IO ()
@@ -113,7 +113,7 @@ grassfsOpenDirectory "/" = return eOK
 grassfsOpenDirectory _   = return eNOENT
 
 grassfsSetFileSize :: FilePath -> FileOffset -> IO Errno
-grassfsSetFileSize path off = return eOK
+grassfsSetFileSize _ _ = return eOK
 
 grassfsReadDirectory :: FilePath -> IO (Either Errno [(FilePath, FileStat)])
 grassfsReadDirectory "/" = do
@@ -126,7 +126,7 @@ grassfsReadDirectory "/" = do
 grassfsReadDirectory _ = return (Left eNOENT)
 
 grassfsOpen :: FilePath -> OpenMode -> OpenFileFlags -> IO (Either Errno HT)
-grassfsOpen path mode flags
+grassfsOpen path _ _
     | path == grassfsPath = return (Right ())
     | otherwise         = return (Left eNOENT)
 
@@ -152,7 +152,7 @@ grassfsWrite path _ bstr offset
   | otherwise = return $ Left eNOENT
 
 grassfsGetFileSystemStats :: String -> IO (Either Errno FileSystemStats)
-grassfsGetFileSystemStats str =
+grassfsGetFileSystemStats _ =
   return $ Right FileSystemStats
     { fsStatBlockSize = 512
     , fsStatBlockCount = 1

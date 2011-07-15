@@ -27,7 +27,7 @@ mount: GrassFs
 	./GrassFs mount
 
 umount:
-	fusermount -u mount
+	-fusermount -u mount
 	rm -rf mount
 
 clean:
