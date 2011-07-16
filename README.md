@@ -22,6 +22,18 @@ Grass言語については↓を参照してください。
 でもまだutf8対応してないです。
 それから文字入力もまだ実装されていません。
 
+また、
+[関数型イカ娘本](http://partake.in/events/90ec5022-00ee-452b-a73e-58c943b13336)
+のためにGrass言語インタープリタとしてふるまうファイルシステムを作りました。
+
+    $ make mount
+    $ cat testdata/helloworld.in > mount/grassvm
+    $ sync;sync;sync
+    $ cat mount/grassvm
+    Hello, world!
+
+みたいに使えます。
+
 テスト
 ------
 
@@ -29,3 +41,4 @@ Grass言語については↓を参照してください。
 をインストールしてから↓でテスト実行します。
 
     $ make test
+
